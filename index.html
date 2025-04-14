@@ -3,23 +3,290 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Global Temperature Variations Heat Map (1753-2015)">
+  <meta name="color-scheme" content="light">
   <title>Global Temperature Heat Map</title>
-  <link rel="stylesheet" href="styles.css">
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://cdn.freecodecamp.org/testable-projects-fcc/v1/bundle.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+    }
+
+    html {
+      background-color: #f4f4f9;
+      color: #333;
+      color-scheme: light;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f9;
+      color: #333;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #title {
+      font-size: 24px;
+      font-weight: bold;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    #description {
+      font-size: 16px;
+      text-align: center;
+      margin-bottom: 20px;
+      max-width: 800px;
+      color: #666;
+    }
+
+    #tooltip {
+      position: absolute;
+      background-color: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 10px;
+      border-radius: 5px;
+      pointer-events: none;
+      opacity: 0;
+      z-index: 10;
+      font-size: 14px;
+      transition: opacity 0.2s;
+    }
+
+    .cell:hover {
+      stroke: #000;
+      stroke-width: 1px;
+    }
+
+    #legend {
+      margin-top: 30px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      html {
+        /* Force light mode colors even in dark mode */
+        background-color: #f4f4f9 !important;
+        color: #333 !important;
+      }
+      
+      body {
+        background-color: #f4f4f9 !important;
+        color: #333 !important;
+      }
+      
+      #description {
+        color: #666 !important;
+      }
+      
+      /* Force all other elements to maintain light mode appearance */
+      * {
+        border-color: initial !important;
+      }
+      
+      svg text {
+        fill: #333 !important;
+      }
+      
+      .axis line, .axis path {
+        stroke: #333 !important;
+      }
+    }
+  </style>
 </head>
 <body>
-  <main class="container">
-    <header>
-      <h1 id="title">Global Temperature Variations</h1>
-      <h2 id="description">Monthly Global Land-Surface Temperature (1753 - 2015)</h2>
-    </header>
-    <div id="heatmap-container">
-      <svg id="heatmap" aria-label="Temperature heat map visualization"></svg>
-    </div>
-    <div id="legend" aria-label="Temperature color scale"></div>
-    <div id="tooltip" role="tooltip"></div>
-  </main>
-  <script src="https://d3js.org/d3.v6.min.js"></script>
-  <script src="script.js"></script>
+  <h1 id="title">Global Land-Surface Temperature</h1>
+  <p id="description">1753 - 2015: base temperature 8.66℃</p>
+  <div id="tooltip"></div>
+  <div id="chart"></div>
+
+  <script>
+    // URL to the dataset
+    const url = 'https://raw.githubusercontent.com/freeCodeCamp/ProjectReferenceData/master/global-temperature.json';
+
+    // Fetch the data
+    fetch(url)
+      .then(response => response.json())
+      .then(data => {
+        renderHeatMap(data);
+      })
+      .catch(error => {
+        console.error('Error loading data:', error);
+        document.getElementById('chart').innerHTML = 
+          `<div style="color: red; text-align: center; padding: 20px;">
+            Error loading data: ${error.message}
+          </div>`;
+      });
+
+    function renderHeatMap(data) {
+      const baseTemp = data.baseTemperature;
+      const monthlyData = data.monthlyVariance;
+
+      // Format the data - convert month numbers to Date objects for proper axis formatting
+      monthlyData.forEach(d => {
+        d.month = d.month - 1; // Adjust month (0-based in JavaScript)
+        d.monthDate = new Date(2000, d.month, 1); // Use 2000 as a non-leap year for month display
+      });
+
+      // Set dimensions and margins
+      const margin = { top: 30, right: 30, bottom: 100, left: 80 };
+      const width = 1000 - margin.left - margin.right;
+      const height = 500 - margin.top - margin.bottom;
+
+      // Get unique years and months for scaling
+      const years = [...new Set(monthlyData.map(d => d.year))];
+      const months = [...Array(12).keys()];
+
+      // Create SVG
+      const svg = d3.select('#chart')
+        .append('svg')
+        .attr('width', width + margin.left + margin.right)
+        .attr('height', height + margin.top + margin.bottom)
+        .append('g')
+        .attr('transform', `translate(${margin.left}, ${margin.top})`);
+
+      // Create scales
+      const xScale = d3.scaleBand()
+        .domain(years)
+        .range([0, width])
+        .padding(0);
+
+      const yScale = d3.scaleBand()
+        .domain(months)
+        .range([0, height])
+        .padding(0);
+
+      // Create a color scale
+      const minTemp = d3.min(monthlyData, d => baseTemp + d.variance);
+      const maxTemp = d3.max(monthlyData, d => baseTemp + d.variance);
+      
+      const colorScale = d3.scaleSequential()
+        .domain([minTemp, maxTemp])
+        .interpolator(d3.interpolateRdYlBu)
+        .clamp(true);
+
+      // Create axes
+      const xAxis = d3.axisBottom(xScale)
+        .tickValues(xScale.domain().filter(year => year % 10 === 0))
+        .tickFormat(d => d);
+
+      const yAxis = d3.axisLeft(yScale)
+        .tickFormat(month => {
+          const date = new Date(2000, month);
+          return d3.timeFormat('%B')(date);
+        });
+
+      // Add X axis
+      svg.append('g')
+        .attr('class', 'axis')
+        .attr('id', 'x-axis')
+        .attr('transform', `translate(0, ${height})`)
+        .call(xAxis)
+        .selectAll('text')
+        .style('text-anchor', 'middle')
+        .attr('dx', '0em')
+        .attr('dy', '1em');
+
+      // Add Y axis
+      svg.append('g')
+        .attr('class', 'axis')
+        .attr('id', 'y-axis')
+        .call(yAxis);
+
+      // Create cells
+      svg.selectAll('.cell')
+        .data(monthlyData)
+        .enter()
+        .append('rect')
+        .attr('class', 'cell')
+        .attr('x', d => xScale(d.year))
+        .attr('y', d => yScale(d.month))
+        .attr('width', xScale.bandwidth())
+        .attr('height', yScale.bandwidth())
+        .attr('fill', d => colorScale(baseTemp + d.variance))
+        .attr('data-month', d => d.month)
+        .attr('data-year', d => d.year)
+        .attr('data-temp', d => baseTemp + d.variance)
+        .on('mouseover', function(event, d) {
+          const tooltip = d3.select('#tooltip');
+          const date = new Date(2000, d.month);
+          const monthName = d3.timeFormat('%B')(date);
+          
+          // Format the temperature to 1 decimal place
+          const temperature = (baseTemp + d.variance).toFixed(1);
+          const variance = d.variance.toFixed(1);
+          
+          // Show tooltip
+          tooltip
+            .style('opacity', 0.9)
+            .style('left', event.pageX + 10 + 'px')
+            .style('top', event.pageY - 28 + 'px')
+            .attr('data-year', d.year)
+            .html(`
+              <strong>${d.year} - ${monthName}</strong><br>
+              Temperature: ${temperature}°C<br>
+              Variance: ${variance > 0 ? '+' + variance : variance}°C
+            `);
+        })
+        .on('mouseout', function() {
+          d3.select('#tooltip').style('opacity', 0);
+        });
+
+      // Create legend
+      const legendWidth = 400;
+      const legendHeight = 30;
+      const legendRectWidth = legendWidth / (maxTemp - minTemp) * 0.8;
+      
+      const legend = svg.append('g')
+        .attr('id', 'legend')
+        .attr('transform', `translate(${width/2 - legendWidth/2}, ${height + 50})`);
+      
+      // Create gradient definitions
+      const defs = svg.append('defs');
+      
+      const linearGradient = defs.append('linearGradient')
+        .attr('id', 'linear-gradient');
+      
+      linearGradient.selectAll('stop')
+        .data(d3.ticks(0, 1, 10))
+        .enter().append('stop')
+        .attr('offset', d => d)
+        .attr('stop-color', d => colorScale(minTemp + d * (maxTemp - minTemp)));
+      
+      // Draw the color legend
+      legend.append('rect')
+        .attr('width', legendWidth)
+        .attr('height', legendHeight)
+        .style('fill', 'url(#linear-gradient)');
+      
+      // Calculate legend axis scale
+      const legendScale = d3.scaleLinear()
+        .domain([minTemp, maxTemp])
+        .range([0, legendWidth]);
+      
+      // Add legend axis
+      legend.append('g')
+        .attr('transform', `translate(0, ${legendHeight})`)
+        .call(d3.axisBottom(legendScale)
+          .tickFormat(d => d.toFixed(1) + '°C')
+          .ticks(6));
+      
+      // Add axis labels
+      svg.append('text')
+        .attr('transform', `translate(${width/2}, ${height + margin.bottom - 10})`)
+        .style('text-anchor', 'middle')
+        .text('Year');
+      
+      svg.append('text')
+        .attr('transform', 'rotate(-90)')
+        .attr('y', -margin.left + 20)
+        .attr('x', -height/2)
+        .style('text-anchor', 'middle')
+        .text('Month');
+    }
+  </script>
 </body>
 </html>
