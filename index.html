@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Global Temperature Variations Heat Map (1753-2015)">
+  <title>Global Temperature Heat Map</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="container">
+    <header>
+      <h1 id="title">Global Temperature Variations</h1>
+      <h2 id="description">Monthly Global Land-Surface Temperature (1753 - 2015)</h2>
+    </header>
+    <div id="heatmap-container">
+      <svg id="heatmap" aria-label="Temperature heat map visualization"></svg>
+    </div>
+    <div id="legend" aria-label="Temperature color scale"></div>
+    <div id="tooltip" role="tooltip"></div>
+  </main>
+  <script src="https://d3js.org/d3.v6.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
