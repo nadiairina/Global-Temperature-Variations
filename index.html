@@ -276,9 +276,10 @@
       
       // Add axis labels
       svg.append('text')
-        .attr('transform', `translate(${width/2}, ${height + margin.bottom - 10})`)
+        .attr('transform', `translate(${width/2}, ${height + margin.bottom + 20})`)
         .style('text-anchor', 'middle')
         .text('Year');
+     
       
       svg.append('text')
         .attr('transform', 'rotate(-90)')
